@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>わりかんBOT</title>
+<meta name="theme-color" content="#06C755">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="わりかん">
+<style>
+  :root{
+    --line-green: #06C755;
+    --line-green-dark: #05a648;
+    --bg-chat: #7494c0;
+    --bg-chat-2: #8ba7cc;
+    --text-dark: #202124;
+    --text-sub: #6b7280;
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html,body{ margin:0; padding:0; height:100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    background:#000;
+  }
+  .phone{
+    max-width:480px; margin:0 auto; height:100vh; height:100dvh;
+    display:flex; flex-direction:column;
+    background: linear-gradient(180deg, var(--bg-chat) 0%, var(--bg-chat-2) 100%);
+    position:relative; overflow:hidden;
+  }
+
+  /* ---------- gate (room create/join) ---------- */
+  .gate{ position:absolute; inset:0; z-index:100; background:linear-gradient(180deg,#7494c0,#8ba7cc);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; color:#fff; }
+  .gate .logo{ width:64px;height:64px;border-radius:18px; background:var(--line-green); display:flex;align-items:center;justify-content:center;
+    font-size:28px; font-weight:800; color:#fff; margin-bottom:14px; box-shadow:0 4px 14px rgba(0,0,0,0.25); }
+  .gate h1{ font-size:19px; margin:0 0 6px; }
+  .gate p{ font-size:13px; opacity:0.9; margin:0 0 22px; line-height:1.6; }
+  .gate-card{ background:#fff; border-radius:16px; padding:18px; width:100%; max-width:320px; box-shadow:0 6px 20px rgba(0,0,0,0.2); }
+  .gate-card button{ width:100%; border:none; border-radius:12px; padding:13px; font-size:14.5px; font-weight:700; cursor:pointer; margin-bottom:10px; }
+  .btn-primary{ background:var(--line-green); color:#fff; }
+  .btn-primary:active{ background:var(--line-green-dark); }
+  .gate-or{ font-size:11px; color:#9aa0a6; margin:6px 0 10px; font-weight:600; }
+  .gate-card input{ width:100%; border:1.5px solid #e5e7eb; border-radius:10px; padding:11px; font-size:14px; margin-bottom:10px;
+    text-align:center; letter-spacing:2px; font-weight:700; text-transform:uppercase; }
+  .btn-secondary{ background:#f1f3f5; color:var(--text-dark); }
+  .btn-secondary:active{ background:#e5e7eb; }
+  .gate-error{ color:#ffe4e1; font-size:12px; margin-top:8px; min-height:16px; }
+  .gate-config-warning{ background:#fff3cd; color:#7a5900; border-radius:10px; padding:10px 12px; font-size:11.5px; line-height:1.6; margin-top:16px; max-width:320px; text-align:left; }
+
+  /* ---------- header ---------- */
+  .header{ background:#fff; padding:10px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.15); z-index:6; flex-shrink:0; }
+  .header-top{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .avatar{ width:36px;height:36px;border-radius:10px; background:var(--line-green);
+    display:flex;align-items:center;justify-content:center; font-weight:700; color:#fff; font-size:15px; flex-shrink:0; }
+  .header-title{ display:flex; flex-direction:column; line-height:1.25; flex:1; min-width:0; }
+  .header-title .name{ font-weight:700; font-size:14.5px; color:var(--text-dark); cursor:pointer;
+    display:flex; align-items:center; gap:5px; }
+  .header-title .name .edit-ic{ font-size:11px; color:#b9bfc7; }
+  .header-title .status{ font-size:11px; color:var(--line-green-dark); font-weight:600; display:flex; align-items:center; gap:5px; }
+  .sync-dot{ width:6px;height:6px;border-radius:50%; background:var(--line-green); flex-shrink:0; }
+  .sync-dot.saving{ background:#f5a623; animation: blink 0.8s infinite; }
+  @keyframes blink{ 50%{ opacity:0.3; } }
+  .room-chip{ border:none; background:#eef7f1; color:var(--line-green-dark); font-size:11px; font-weight:700;
+    padding:5px 8px; border-radius:10px; cursor:pointer; flex-shrink:0; white-space:nowrap; }
+  .room-chip:active{ background:#dcf0e3; }
+
+  .members-row{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .members-row::-webkit-scrollbar{ display:none; }
+  .member-chip{ flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; width:46px; }
+  .member-chip .m-avatar{ width:34px;height:34px;border-radius:50%; display:flex;align-items:center;justify-content:center;
+    color:#fff; font-size:13px; font-weight:700; border:2px solid transparent; }
+  .member-chip .m-name{ font-size:9.5px; color:#555; max-width:46px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .add-chip{ flex-shrink:0; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; width:46px; }
+  .add-chip .m-avatar{ width:34px;height:34px;border-radius:50%; background:#eef0f2; border:2px dashed #b9bfc7;
+    display:flex;align-items:center;justify-content:center; color:#8a8f98; font-size:17px; font-weight:700; }
+  .add-chip .m-name{ font-size:9.5px; color:#8a8f98; }
+
+  .month-nav{ flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+    background:rgba(255,255,255,0.92); padding:7px 14px; z-index:5; border-bottom:1px solid rgba(0,0,0,0.06); }
+  .month-nav button{ width:26px;height:26px;border-radius:50%; border:none; background:#fff; color:var(--text-dark);
+    font-size:14px; font-weight:700; box-shadow:0 1px 2px rgba(0,0,0,0.15); cursor:pointer; }
+  .month-nav button:disabled{ opacity:0.35; }
+  .month-nav .m-label{ font-size:13.5px; font-weight:800; color:var(--text-dark); }
+  .month-nav .m-total{ font-size:11px; color:var(--text-sub); font-weight:600; }
+
+  .chat{ flex:1; overflow-y:auto; padding:14px 12px 8px; display:flex; flex-direction:column; gap:2px; }
+  .chat::-webkit-scrollbar{ display:none; }
+  .empty-state{ margin:auto; text-align:center; color:rgba(255,255,255,0.92); padding:30px 20px; }
+  .empty-state .big{ font-size:34px; margin-bottom:8px; }
+  .empty-state .msg{ font-size:13.5px; font-weight:600; line-height:1.7; }
+
+  .msg-row{ display:flex; gap:7px; margin:6px 0; align-items:flex-end; max-width:88%; }
+  .m-avatar-sm{ width:28px;height:28px;border-radius:50%; flex-shrink:0;
+    display:flex;align-items:center;justify-content:center; color:#fff; font-size:11.5px; font-weight:700; }
+  .msg-col{ display:flex; flex-direction:column; }
+  .sender-name{ font-size:11px; color:#3d4a5c; font-weight:700; margin:0 0 2px 2px; }
+  .msg-bubble-wrap{ display:flex; align-items:flex-end; gap:6px; }
+  .bubble{ padding:8px 12px; border-radius:15px; border-bottom-left-radius:4px;
+    font-size:14px; line-height:1.5; background:#fff; color:var(--text-dark);
+    box-shadow:0 1px 1px rgba(0,0,0,0.08); animation: pop .16s ease; }
+  @keyframes pop{ from{ transform:scale(0.85); opacity:0; } to{ transform:scale(1); opacity:1; } }
+  .bubble .amt{ font-weight:800; }
+  .bubble .memo{ color:var(--text-sub); font-size:12px; margin-top:2px; }
+  .time{ font-size:10px; color:rgba(255,255,255,0.8); white-space:nowrap; margin-bottom:2px; }
+
+  .date-chip{ align-self:center; background:rgba(255,255,255,0.55); color:#3d4a5c; font-size:11px;
+    padding:4px 12px; border-radius:12px; margin:4px 0 12px; font-weight:600; }
+
+  .summary-card{ flex-shrink:0; background:#fff; margin:0 10px 8px; border-radius:14px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.18); overflow:hidden; display:none; }
+  .summary-card.show{ display:block; }
+  .summary-head{ background:var(--line-green); color:#fff; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; }
+  .summary-head .t1{ font-size:11px; font-weight:700; opacity:0.9; }
+  .summary-head .t2{ font-size:19px; font-weight:800; }
+  .summary-body{ padding:10px 14px 4px; }
+  .per-row{ display:flex; justify-content:space-between; align-items:center; padding:5px 0; font-size:13px; border-bottom:1px solid #f1f2f4; }
+  .per-row:last-child{ border-bottom:none; }
+  .per-row .p-name{ display:flex; align-items:center; gap:6px; color:var(--text-dark); font-weight:600; }
+  .per-row .p-name .dot{ width:9px;height:9px;border-radius:50%; }
+  .per-row .p-diff{ font-weight:700; font-size:13px; }
+  .diff-plus{ color:var(--line-green-dark); }
+  .diff-minus{ color:#e0483f; }
+  .diff-zero{ color:#9aa0a6; }
+  .settle-title{ font-size:11px; color:var(--text-sub); font-weight:700; margin:8px 0 4px; }
+  .settle-line{ font-size:12.5px; color:var(--text-dark); padding:3px 0; }
+  .settle-line b{ color:var(--line-green-dark); }
+  .settle-empty{ font-size:12px; color:var(--text-sub); padding:4px 0 8px; }
+
+  .payer-row{ flex-shrink:0; display:flex; gap:6px; padding:6px 10px 0; overflow-x:auto; background:#fff; }
+  .payer-row::-webkit-scrollbar{ display:none; }
+  .payer-pill{ flex-shrink:0; display:flex; align-items:center; gap:5px; padding:5px 10px 5px 5px;
+    border-radius:16px; background:#f1f3f5; font-size:12px; font-weight:700; color:#555; cursor:pointer; border:1.5px solid transparent; }
+  .payer-pill .p-avatar{ width:20px;height:20px;border-radius:50%; display:flex;align-items:center;justify-content:center; color:#fff; font-size:9.5px; font-weight:700; }
+  .payer-pill.active{ background:#e6f9ee; border-color:var(--line-green); color:var(--line-green-dark); }
+
+  .input-bar{ flex-shrink:0; background:#fff; padding:8px 10px; padding-bottom:max(8px, env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:8px; border-top:1px solid #e5e7eb; }
+  .yen-input-wrap{ flex:1; display:flex; align-items:center; background:#f1f3f5; border-radius:20px; padding:0 6px 0 14px; }
+  .yen-input-wrap span{ font-size:14px; color:#8a8f98; font-weight:700; margin-right:2px; }
+  .yen-input-wrap input{ flex:1; border:none; background:transparent; padding:10px 4px; font-size:16px; outline:none; color:var(--text-dark); min-width:0; }
+  .memo-input{ width:60px; border:none; background:transparent; padding:10px 6px 10px 0; font-size:13px; outline:none; color:#6b7280; border-left:1px solid #dfe3e8; min-width:0; }
+  .send-btn{ width:40px;height:40px;border-radius:50%; background:var(--line-green); border:none; color:#fff;
+    display:flex;align-items:center;justify-content:center; flex-shrink:0; cursor:pointer; transition:transform .1s, background .15s; }
+  .send-btn:active{ transform:scale(0.9); background:var(--line-green-dark); }
+  .send-btn:disabled{ background:#c8ccd0; }
+  .send-btn svg{ width:18px;height:18px; margin-left:2px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ルーム作成/参加ゲート -->
+  <div class="gate" id="gate">
+    <div class="logo">割</div>
+    <h1>わりかんBOT</h1>
+    <p>グループでルームコードを共有すると、<br>全員の記録がリアルタイムで同期されるよ</p>
+    <div class="gate-card">
+      <button class="btn-primary" id="createRoomBtn">新しいルームを作る</button>
+      <div class="gate-or">または</div>
+      <input id="joinRoomInput" placeholder="ルームコードを入力" maxlength="6">
+      <button class="btn-secondary" id="joinRoomBtn">ルームに参加する</button>
+      <div class="gate-error" id="gateError"></div>
+    </div>
+    <div class="gate-config-warning" id="configWarning" style="display:none;">
+      ⚠️ Firebaseの設定（firebase-config.js）が未入力です。index.html先頭のfirebaseConfigに、あなたのFirebaseプロジェクトの値を入れてください。
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="header-top">
+      <div class="avatar" id="botAvatar">割</div>
+      <div class="header-title">
+        <div class="name" id="groupName">みんなの割り勘グループ<span class="edit-ic">✎</span></div>
+        <div class="status"><span class="sync-dot" id="syncDot"></span><span id="syncText">読み込み中…</span></div>
+      </div>
+      <button class="room-chip" id="roomChip">🔗 ----</button>
+    </div>
+    <div class="members-row" id="membersRow"></div>
+  </div>
+
+  <div class="month-nav">
+    <button id="prevMonthBtn" aria-label="前の月">‹</button>
+    <div style="text-align:center;">
+      <div class="m-label" id="monthLabel">2026年7月</div>
+      <div class="m-total" id="monthTotal">今月の合計 ¥0</div>
+    </div>
+    <button id="nextMonthBtn" aria-label="次の月">›</button>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="summary-card" id="summaryCard">
+    <div class="summary-head">
+      <div>
+        <div class="t1">今月の合計</div>
+        <div class="t2" id="totalAmt">¥0</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="t1">ひとり分</div>
+        <div class="t2" id="perAmt" style="font-size:16px;">¥0</div>
+      </div>
+    </div>
+    <div class="summary-body">
+      <div id="perRows"></div>
+      <div class="settle-title">💸 精算方法</div>
+      <div id="settleRows"></div>
+    </div>
+  </div>
+
+  <div class="payer-row" id="payerRow"></div>
+
+  <div class="input-bar">
+    <div class="yen-input-wrap">
+      <span>¥</span>
+      <input id="amountInput" type="number" inputmode="numeric" placeholder="金額を入力" />
+      <input id="memoInput" class="memo-input" type="text" placeholder="メモ" />
+    </div>
+    <button class="send-btn" id="sendBtn" aria-label="送信" disabled>
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 20l18-8L3 4v6l12 2-12 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--  Firebase SDK (compatバージョン / ビルド不要)                  -->
+<!-- ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script>
+/* ============================================================
+   ★★★ ここにあなたのFirebaseプロジェクトの設定を貼り付けてください ★★★
+   Firebaseコンソール(https://console.firebase.google.com/) →
+   プロジェクト設定 → 全般 → マイアプリ → SDKの設定と構成 で確認できます。
+   セットアップ手順は README.md を参照してください。
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+</script>
+
+<script>
+(function(){
+  const COLORS = ['#4D96FF','#FF6B6B','#FFB800','#B983FF','#00C2A8','#FF8FB1','#6C7A89','#FF9F45','#57C7FF','#C97B4A'];
+  const ROOM_KEY = 'warikan-room-code';
+
+  const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
+
+  let db = null;
+  if (isConfigured) {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  }
+
+  let groupName = 'みんなの割り勘グループ';
+  let members = [
+    { id: 1, name: 'あなた', color: COLORS[0] },
+    { id: 2, name: 'Aさん', color: COLORS[1] }
+  ];
+  let nextId = 3;
+  let entries = [];
+  let selectedPayer = members[0].id;
+  let roomCode = null;
+  let unsubscribe = null;
+  let applyingRemote = false;
+
+  const realNow = new Date();
+  const currentMonthKey = monthKey(realNow);
+  let selectedMonthKey = currentMonthKey;
+
+  const gate = document.getElementById('gate');
+  const createRoomBtn = document.getElementById('createRoomBtn');
+  const joinRoomBtn = document.getElementById('joinRoomBtn');
+  const joinRoomInput = document.getElementById('joinRoomInput');
+  const gateError = document.getElementById('gateError');
+  const configWarning = document.getElementById('configWarning');
+  const roomChip = document.getElementById('roomChip');
+
+  const membersRow = document.getElementById('membersRow');
+  const payerRow = document.getElementById('payerRow');
+  const chat = document.getElementById('chat');
+  const amountInput = document.getElementById('amountInput');
+  const memoInput = document.getElementById('memoInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const summaryCard = document.getElementById('summaryCard');
+  const totalAmt = document.getElementById('totalAmt');
+  const perAmt = document.getElementById('perAmt');
+  const perRows = document.getElementById('perRows');
+  const settleRows = document.getElementById('settleRows');
+  const groupNameEl = document.getElementById('groupName');
+  const botAvatar = document.getElementById('botAvatar');
+  const monthLabelEl = document.getElementById('monthLabel');
+  const monthTotalEl = document.getElementById('monthTotal');
+  const prevMonthBtn = document.getElementById('prevMonthBtn');
+  const nextMonthBtn = document.getElementById('nextMonthBtn');
+  const syncDot = document.getElementById('syncDot');
+  const syncText = document.getElementById('syncText');
+
+  function fmt(n){ const r=Math.round(n); return (r<0?'-¥':'¥')+Math.abs(r).toLocaleString('ja-JP'); }
+  function initial(name){ return name.trim().charAt(0) || '?'; }
+  function memberById(id){ return members.find(m=>m.id===id); }
+  function timeStrFor(d){ let h=d.getHours(), m=d.getMinutes(); return (h<10?'0'+h:h)+':'+(m<10?'0'+m:m); }
+  function monthKey(date){ return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0'); }
+  function monthLabelText(key){ const [y,m]=key.split('-'); return `${y}年${parseInt(m,10)}月`; }
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function genRoomCode(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 紛らわしい文字を除外
+    let code = '';
+    for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+    return code;
+  }
+
+  // ---------- gate / room handling ----------
+  function showGate(errorMsg){
+    gate.style.display = 'flex';
+    gateError.textContent = errorMsg || '';
+    if(!isConfigured) configWarning.style.display = 'block';
+  }
+  function hideGate(){ gate.style.display = 'none'; }
+
+  createRoomBtn.addEventListener('click', async ()=>{
+    if(!isConfigured){ gateError.textContent = 'Firebaseの設定が未入力のため作成できません'; return; }
+    const code = genRoomCode();
+    try{
+      await db.collection('warikanGroups').doc(code).set(defaultPayload());
+      localStorage.setItem(ROOM_KEY, code);
+      enterRoom(code);
+    }catch(err){
+      console.error(err);
+      gateError.textContent = 'ルーム作成に失敗しました。通信環境をご確認ください';
+    }
+  });
+
+  joinRoomBtn.addEventListener('click', async ()=>{
+    const code = joinRoomInput.value.trim().toUpperCase();
+    if(!code){ gateError.textContent = 'ルームコードを入力してください'; return; }
+    if(!isConfigured){ gateError.textContent = 'Firebaseの設定が未入力のため参加できません'; return; }
+    try{
+      const doc = await db.collection('warikanGroups').doc(code).get();
+      if(!doc.exists){ gateError.textContent = 'そのルームコードは見つかりませんでした'; return; }
+      localStorage.setItem(ROOM_KEY, code);
+      enterRoom(code);
+    }catch(err){
+      console.error(err);
+      gateError.textContent = '参加に失敗しました。通信環境をご確認ください';
+    }
+  });
+
+  roomChip.addEventListener('click', async ()=>{
+    if(!roomCode) return;
+    const action = confirm(`ルームコード: ${roomCode}\n\nOK＝コピー　キャンセル＝ルームを退出`);
+    if(action){
+      try{ await navigator.clipboard.writeText(roomCode); alert('コピーしました。グループのメンバーに共有してね'); }
+      catch(e){ alert('コード: ' + roomCode); }
+    } else {
+      if(confirm('このルームから退出しますか？（データは削除されません）')){
+        localStorage.removeItem(ROOM_KEY);
+        if(unsubscribe) unsubscribe();
+        location.reload();
+      }
+    }
+  });
+
+  function defaultPayload(){
+    return {
+      groupName,
+      members,
+      nextId,
+      selectedPayer,
+      entries: []
+    };
+  }
+
+  function enterRoom(code){
+    roomCode = code;
+    roomChip.textContent = '🔗 ' + code;
+    hideGate();
+    listenToRoom();
+  }
+
+  // ---------- firestore realtime sync ----------
+  function listenToRoom(){
+    syncDot.className = 'sync-dot saving';
+    syncText.textContent = '接続中…';
+    unsubscribe = db.collection('warikanGroups').doc(roomCode).onSnapshot((doc)=>{
+      if(!doc.exists) return;
+      applyingRemote = true;
+      const data = doc.data();
+      groupName = data.groupName || groupName;
+      members = Array.isArray(data.members) && data.members.length ? data.members : members;
+      nextId = data.nextId || nextId;
+      if(!memberById(selectedPayer)) selectedPayer = members[0].id;
+      entries = (data.entries || []).map(e => ({
+        payerId: e.payerId, amount: e.amount, memo: e.memo,
+        date: new Date(e.dateISO), timeStr: timeStrFor(new Date(e.dateISO))
+      }));
+      renderGroupName();
+      renderMembersHeader();
+      renderPayerRow();
+      renderAll();
+      syncDot.className = 'sync-dot';
+      syncText.style.color = '';
+      syncText.textContent = `${members.length}人と共有中`;
+      applyingRemote = false;
+    }, (err)=>{
+      console.error('listen error', err);
+      syncDot.className = 'sync-dot';
+      syncText.style.color = '#e0483f';
+      syncText.textContent = '同期エラー';
+    });
+  }
+
+  let saveTimer = null;
+  function queueSave(){
+    if(applyingRemote) return; // リモートからの反映中は書き戻さない
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveState, 300);
+  }
+  async function saveState(){
+    if(!roomCode || !db) return;
+    syncDot.className = 'sync-dot saving';
+    syncText.textContent = '保存中…';
+    const payload = {
+      groupName, members, nextId, selectedPayer,
+      entries: entries.map(e => ({ payerId:e.payerId, amount:e.amount, memo:e.memo, dateISO:e.date.toISOString() }))
+    };
+    try{
+      await db.collection('warikanGroups').doc(roomCode).set(payload);
+      syncDot.className = 'sync-dot';
+      syncText.style.color = '';
+      syncText.textContent = `${members.length}人と共有中`;
+    }catch(err){
+      console.error('save failed', err);
+      syncDot.className = 'sync-dot';
+      syncText.style.color = '#e0483f';
+      syncText.textContent = '保存に失敗しました';
+    }
+  }
+
+  // ---------- rendering ----------
+  function renderGroupName(){
+    groupNameEl.innerHTML = `${escapeHtml(groupName)}<span class="edit-ic">✎</span>`;
+    botAvatar.textContent = initial(groupName);
+  }
+  groupNameEl.addEventListener('click', ()=>{
+    const newName = prompt('グループ名を入力してね', groupName);
+    if(newName && newName.trim()){ groupName = newName.trim(); renderGroupName(); queueSave(); }
+  });
+
+  function renderMembersHeader(){
+    membersRow.innerHTML = '';
+    members.forEach(m=>{
+      const chip = document.createElement('div');
+      chip.className = 'member-chip';
+      chip.innerHTML = `<div class="m-avatar" style="background:${m.color}">${initial(m.name)}</div><div class="m-name">${escapeHtml(m.name)}</div>`;
+      chip.addEventListener('click', ()=>{
+        const newName = prompt('名前を編集（空にして削除）', m.name);
+        if(newName === null) return;
+        if(newName.trim() === ''){
+          if(members.length <= 2){ alert('メンバーは2人以上必要だよ'); return; }
+          if(!confirm(`${m.name} を削除する？`)) return;
+          members = members.filter(x=>x.id!==m.id);
+          if(selectedPayer === m.id) selectedPayer = members[0].id;
+        } else { m.name = newName.trim(); }
+        renderMembersHeader(); renderPayerRow(); renderAll(); queueSave();
+      });
+      membersRow.appendChild(chip);
+    });
+    const addChip = document.createElement('div');
+    addChip.className = 'add-chip';
+    addChip.innerHTML = `<div class="m-avatar">＋</div><div class="m-name">追加</div>`;
+    addChip.addEventListener('click', ()=>{
+      const name = prompt('新しいメンバーの名前は？');
+      if(name && name.trim()){
+        members.push({ id: nextId++, name: name.trim(), color: COLORS[members.length % COLORS.length] });
+        renderMembersHeader(); renderPayerRow(); renderAll(); queueSave();
+      }
+    });
+    membersRow.appendChild(addChip);
+  }
+
+  function renderPayerRow(){
+    payerRow.innerHTML = '';
+    members.forEach(m=>{
+      const pill = document.createElement('div');
+      pill.className = 'payer-pill' + (m.id === selectedPayer ? ' active' : '');
+      pill.innerHTML = `<div class="p-avatar" style="background:${m.color}">${initial(m.name)}</div>${escapeHtml(m.name)}`;
+      pill.addEventListener('click', ()=>{ selectedPayer = m.id; renderPayerRow(); });
+      payerRow.appendChild(pill);
+    });
+  }
+
+  function entriesForMonth(key){ return entries.filter(e => monthKey(e.date) === key); }
+
+  function renderMonthNav(){
+    monthLabelEl.textContent = monthLabelText(selectedMonthKey);
+    const t = entriesForMonth(selectedMonthKey).reduce((s,e)=>s+e.amount,0);
+    monthTotalEl.textContent = `今月の合計 ${fmt(t)}`;
+    nextMonthBtn.disabled = (selectedMonthKey === currentMonthKey);
+  }
+  function shiftMonth(delta){
+    const [y,m] = selectedMonthKey.split('-').map(Number);
+    const newKey = monthKey(new Date(y, m-1+delta, 1));
+    if(newKey > currentMonthKey) return;
+    selectedMonthKey = newKey;
+    renderAll();
+  }
+  prevMonthBtn.addEventListener('click', ()=>shiftMonth(-1));
+  nextMonthBtn.addEventListener('click', ()=>shiftMonth(1));
+
+  function renderChat(){
+    chat.innerHTML = '';
+    const list = entriesForMonth(selectedMonthKey);
+    if(list.length === 0){
+      const div = document.createElement('div');
+      div.className = 'empty-state';
+      div.innerHTML = `<div class="big">🧾</div><div class="msg">${monthLabelText(selectedMonthKey)}の記録はまだないよ<br>金額を送るとここに表示されるよ</div>`;
+      chat.appendChild(div);
+      return;
+    }
+    const chip = document.createElement('div');
+    chip.className = 'date-chip';
+    chip.textContent = monthLabelText(selectedMonthKey);
+    chat.appendChild(chip);
+    list.forEach(entry=>{
+      const m = memberById(entry.payerId);
+      if(!m) return;
+      const row = document.createElement('div');
+      row.className = 'msg-row';
+      row.innerHTML = `
+        <div class="m-avatar-sm" style="background:${m.color}">${initial(m.name)}</div>
+        <div class="msg-col">
+          <div class="sender-name">${escapeHtml(m.name)}</div>
+          <div class="msg-bubble-wrap">
+            <div class="bubble"><span class="amt">${fmt(entry.amount)}</span> を支払った${entry.memo ? `<div class="memo">${escapeHtml(entry.memo)}</div>` : ''}</div>
+            <div class="time">${entry.timeStr}</div>
+          </div>
+        </div>`;
+      chat.appendChild(row);
+    });
+  }
+
+  function computeSettlement(diffs){
+    const creditors = diffs.filter(d=>d.diff>0.5).map(d=>({...d})).sort((a,b)=>b.diff-a.diff);
+    const debtors = diffs.filter(d=>d.diff<-0.5).map(d=>({...d, diff:-d.diff})).sort((a,b)=>b.diff-a.diff);
+    const transactions = [];
+    let i=0, j=0;
+    while(i<debtors.length && j<creditors.length){
+      const pay = Math.min(debtors[i].diff, creditors[j].diff);
+      transactions.push({ from: debtors[i].name, to: creditors[j].name, amount: pay });
+      debtors[i].diff -= pay; creditors[j].diff -= pay;
+      if(debtors[i].diff < 0.5) i++;
+      if(creditors[j].diff < 0.5) j++;
+    }
+    return transactions;
+  }
+
+  function renderSummary(){
+    const list = entriesForMonth(selectedMonthKey);
+    if(list.length === 0){ summaryCard.classList.remove('show'); return; }
+    const total = list.reduce((s,e)=>s+e.amount,0);
+    const n = members.length || 1;
+    const share = total / n;
+    totalAmt.textContent = fmt(total);
+    perAmt.textContent = fmt(share);
+    const diffs = members.map(m=>{
+      const paid = list.filter(e=>e.payerId===m.id).reduce((s,e)=>s+e.amount,0);
+      return { id:m.id, name:m.name, color:m.color, paid, diff: paid - share };
+    });
+    perRows.innerHTML = diffs.map(d=>{
+      let cls='diff-zero', sign='';
+      if(d.diff>0.5){ cls='diff-plus'; sign='+'; } else if(d.diff<-0.5){ cls='diff-minus'; }
+      return `<div class="per-row">
+        <div class="p-name"><span class="dot" style="background:${d.color}"></span>${escapeHtml(d.name)}（${fmt(d.paid)}支払）</div>
+        <div class="p-diff ${cls}">${sign}${fmt(Math.abs(d.diff))}</div>
+      </div>`;
+    }).join('');
+    const tx = computeSettlement(diffs);
+    settleRows.innerHTML = tx.length === 0
+      ? `<div class="settle-empty">精算の必要はないよ 🎉</div>`
+      : tx.map(t => `<div class="settle-line">${escapeHtml(t.from)} → ${escapeHtml(t.to)} に <b>${fmt(t.amount)}</b></div>`).join('');
+    summaryCard.classList.add('show');
+  }
+
+  function renderAll(){ renderMonthNav(); renderChat(); renderSummary(); }
+  function scrollBottom(){ chat.scrollTop = chat.scrollHeight; }
+
+  function trySend(){
+    const raw = amountInput.value;
+    const amount = parseFloat(raw);
+    if(!raw || isNaN(amount) || amount <= 0) return;
+    if(!memberById(selectedPayer)) return;
+    const memo = memoInput.value.trim();
+    const now = new Date();
+    entries.push({ payerId: selectedPayer, amount, memo, date: now, timeStr: timeStrFor(now) });
+    selectedMonthKey = currentMonthKey;
+    renderAll(); scrollBottom();
+    amountInput.value = ''; memoInput.value = ''; sendBtn.disabled = true; amountInput.focus();
+    queueSave();
+  }
+  amountInput.addEventListener('input', ()=>{ sendBtn.disabled = !(amountInput.value && parseFloat(amountInput.value) > 0); });
+  amountInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); trySend(); } });
+  memoInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); trySend(); } });
+  sendBtn.addEventListener('click', trySend);
+
+  // ---------- boot ----------
+  renderGroupName();
+  renderMembersHeader();
+  renderPayerRow();
+
+  const savedRoom = localStorage.getItem(ROOM_KEY);
+  if(savedRoom && isConfigured){
+    enterRoom(savedRoom);
+  } else {
+    showGate();
+  }
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('./service-worker.js').catch(e=>console.log('SW registration failed', e));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
