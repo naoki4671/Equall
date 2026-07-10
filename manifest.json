@@ -1,6 +1,6 @@
 {
-  "name": "わりかんBOT",
-  "short_name": "わりかん",
+  "name": "Equall Pay",
+　"short_name": "Equall Pay",
   "description": "グループの割り勘をLINEチャット風に記録・精算するアプリ",
   "start_url": "./index.html",
   "scope": "./",
