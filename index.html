@@ -104,7 +104,8 @@
   @keyframes pop{ from{ transform:scale(0.85); opacity:0; } to{ transform:scale(1); opacity:1; } }
   .bubble .amt{ font-weight:800; }
   .bubble .memo{ color:var(--text-sub); font-size:12px; margin-top:2px; }
-  .time{ font-size:10px; color:rgba(255,255,255,0.8); white-space:nowrap; margin-bottom:2px; }
+  .time{ font-size:10px; color:rgba(255,255,255,0.8); white-space:nowrap; margin-bottom:2px; }.delete-btn{ border:none; background:transparent; color:rgba(255,255,255,0.85); font-size:13px; cursor:pointer; padding:2px 4px; margin-bottom:2px; }
+.delete-btn:active{ opacity:0.5; }
 
   .date-chip{ align-self:center; background:rgba(255,255,255,0.55); color:#3d4a5c; font-size:11px;
     padding:4px 12px; border-radius:12px; margin:4px 0 12px; font-weight:600; }
@@ -401,10 +402,11 @@
       members = Array.isArray(data.members) && data.members.length ? data.members : members;
       nextId = data.nextId || nextId;
       if(!memberById(selectedPayer)) selectedPayer = members[0].id;
-      entries = (data.entries || []).map(e => ({
-        payerId: e.payerId, amount: e.amount, memo: e.memo,
-        date: new Date(e.dateISO), timeStr: timeStrFor(new Date(e.dateISO))
-      }));
+      entries = (data.entries || []).map((e, i) => ({
+  id: e.id || ('legacy-' + i + '-' + e.dateISO),
+  payerId: e.payerId, amount: e.amount, memo: e.memo,
+  date: new Date(e.dateISO), timeStr: timeStrFor(new Date(e.dateISO))
+}));
       renderGroupName();
       renderMembersHeader();
       renderPayerRow();
@@ -433,7 +435,7 @@
     syncText.textContent = '保存中…';
     const payload = {
       groupName, members, nextId, selectedPayer,
-      entries: entries.map(e => ({ payerId:e.payerId, amount:e.amount, memo:e.memo, dateISO:e.date.toISOString() }))
+    entries: entries.map(e => ({ id:e.id, payerId:e.payerId, amount:e.amount, memo:e.memo, dateISO:e.date.toISOString() }))
     };
     try{
       await db.collection('warikanGroups').doc(roomCode).set(payload);
@@ -539,18 +541,25 @@
       const row = document.createElement('div');
       row.className = 'msg-row';
       row.innerHTML = `
-        <div class="m-avatar-sm" style="background:${m.color}">${initial(m.name)}</div>
-        <div class="msg-col">
-          <div class="sender-name">${escapeHtml(m.name)}</div>
-          <div class="msg-bubble-wrap">
-            <div class="bubble"><span class="amt">${fmt(entry.amount)}</span> を支払った${entry.memo ? `<div class="memo">${escapeHtml(entry.memo)}</div>` : ''}</div>
-            <div class="time">${entry.timeStr}</div>
-          </div>
-        </div>`;
-      chat.appendChild(row);
+<div class="m-avatar-sm" style="background:${m.color}">${initial(m.name)}</div>
+<div class="msg-col">
+<div class="sender-name">${escapeHtml(m.name)}</div>
+<div class="msg-bubble-wrap">
+<div class="bubble"><span class="amt">${fmt(entry.amount)}</span> を支払った${entry.memo ? `<div class="memo">${escapeHtml(entry.memo)}</div>` : ''}</div>
+<div class="time">${entry.timeStr}</div>
+<button class="delete-btn" aria-label="削除">🗑</button>
+</div>
+</div>`;
+row.querySelector('.delete-btn').addEventListener('click', ()=>deleteEntry(entry.id));
+chat.appendChild(row);
     });
   }
-
+  function deleteEntry(id){
+    if(!confirm('この記録を削除する？')) return;
+    entries = entries.filter(e => e.id !== id);
+    renderAll();
+    queueSave();
+  }
   function computeSettlement(diffs){
     const creditors = diffs.filter(d=>d.diff>0.5).map(d=>({...d})).sort((a,b)=>b.diff-a.diff);
     const debtors = diffs.filter(d=>d.diff<-0.5).map(d=>({...d, diff:-d.diff})).sort((a,b)=>b.diff-a.diff);
@@ -603,7 +612,8 @@
     if(!memberById(selectedPayer)) return;
     const memo = memoInput.value.trim();
     const now = new Date();
-    entries.push({ payerId: selectedPayer, amount, memo, date: now, timeStr: timeStrFor(now) });
+    const entryId = Date.now() + '-' + Math.random().toString(36).slice(2);
+entries.push({ id: entryId, payerId: selectedPayer, amount, memo, date: now, timeStr: timeStrFor(now) });
     selectedMonthKey = currentMonthKey;
     renderAll(); scrollBottom();
     amountInput.value = ''; memoInput.value = ''; sendBtn.disabled = true; amountInput.focus();
