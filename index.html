@@ -503,11 +503,12 @@
     });
   }
 
-  function entriesForMonth(key){ return entries.filter(e => monthKey(e.date) === key); }
+ function entriesForMonth(key){ return entries.filter(e => monthKey(e.date) === key); }
+function activePayerEntries(list){ return list.filter(e => memberById(e.payerId)); }
 
   function renderMonthNav(){
     monthLabelEl.textContent = monthLabelText(selectedMonthKey);
-    const t = entriesForMonth(selectedMonthKey).reduce((s,e)=>s+e.amount,0);
+    const t = activePayerEntries(entriesForMonth(selectedMonthKey)).reduce((s,e)=>s+e.amount,0);
     monthTotalEl.textContent = `今月の合計 ${fmt(t)}`;
     nextMonthBtn.disabled = (selectedMonthKey === currentMonthKey);
   }
@@ -576,8 +577,8 @@ chat.appendChild(row);
   }
 
   function renderSummary(){
-    const list = entriesForMonth(selectedMonthKey);
-    if(list.length === 0){ summaryCard.classList.remove('show'); return; }
+  const list = activePayerEntries(entriesForMonth(selectedMonthKey));
+  if(list.length === 0){ summaryCard.classList.remove('show'); return; }
     const total = list.reduce((s,e)=>s+e.amount,0);
     const n = members.length || 1;
     const share = total / n;
